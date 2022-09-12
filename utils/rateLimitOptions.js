@@ -23,7 +23,7 @@ exports.loginLimiter = rateLimit({
 
 exports.apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 1 hour
-	max: 100, // Limit each IP to 100 create account requests per `window`
+	max: 1000, // Limit each IP to 100 create account requests per `window`
 	message:
 		{
       message: "Trop de requêtes envoyées au serveur de la même adresse ip en moins d'une heure, veuillez patientez une heure avant de recommencer vos activités sur le site"

@@ -30,7 +30,6 @@ exports.checkFieldsPresence = (fieldsArray, reqBody) => {
 exports.formatDate = (date) => {
   const months = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
 
-  console.log('date in date format: ', date)
   const year = date.getFullYear(),
     month = months[date.getMonth()],
     day = date.getDate(),

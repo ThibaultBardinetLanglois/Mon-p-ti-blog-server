@@ -9,16 +9,25 @@ router.get(
   '/get-all-friends-by-user/:userId', 
   auth.verifyToken, 
   user_friendsBodyRequestVerifications.checkUserIdInRequestParams,
-  auth.checkUserIdInParamsRequest,
+  user_friendsDBVerifications.checkIfUserIdInParamsExists,
   user_friendsRoutes.getAllFriendsByUser
 )
 
 router.get(
-  '/get-all-friends-recommandations-by-user', 
+  '/get-all-friends-recommandations-by-user/:userId', 
   auth.verifyToken, 
   user_friendsBodyRequestVerifications.checkUserIdInRequestParams,
   auth.checkUserIdInParamsRequest,
   user_friendsRoutes.getAllFriendsRecommandationsByUser
+)
+
+router.get(
+  '/get-relation-if-it-exists/:userId/:potentialFriendId', 
+  auth.verifyToken, 
+  auth.checkUserIdInParamsRequest,
+  user_friendsBodyRequestVerifications.getRelationIfItExists,
+  user_friendsDBVerifications.getRelationIfItExists,
+  user_friendsRoutes.getRelationIfItExists
 )
 
 router.post(
@@ -31,18 +40,20 @@ router.post(
 )
 
 router.get(
-  '/pending-invitations-sent-by-user', 
+  '/pending-invitations-sent-by-user/:userId', 
   auth.verifyToken, 
-  user_friendsBodyRequestVerifications.checkUserIdInRequestBody,
-  auth.checkUserIdInBodyRequest, 
+  user_friendsBodyRequestVerifications.checkUserIdInRequestParams,
+  user_friendsDBVerifications.checkIfUserIdInParamsExists,
+  auth.checkUserIdInParamsRequest, 
   user_friendsRoutes.getAllPendingInvitationsSentByUser
 )
 
 router.get(
-  '/pending-invitations-received-by-user', 
+  '/pending-invitations-received-by-user/:userId', 
   auth.verifyToken,
-  user_friendsBodyRequestVerifications.checkUserIdInRequestBody,
-  auth.checkUserIdInBodyRequest,
+  user_friendsBodyRequestVerifications.checkUserIdInRequestParams,
+  user_friendsDBVerifications.checkIfUserIdInParamsExists,
+  auth.checkUserIdInParamsRequest,
   user_friendsRoutes.getAllPendingInvitationsReceivedByUser
 )
 

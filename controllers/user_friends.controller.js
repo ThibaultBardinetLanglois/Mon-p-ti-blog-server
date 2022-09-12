@@ -1,6 +1,5 @@
 const user_friendsModel = require('../models/user_friends.model'),
   userModel = require('../models/user.model'),
-  postModel = require("../models/post.model"),
   post_imgsModel = require("../models/post_images.model"),
   post_likesModel = require("../models/post_likes.model"),
   commentsModel = require('../models/comment.model');
@@ -40,106 +39,114 @@ exports.getAllFriendsByUser = async (req, res) => {
   }
 }
 
-// Get all friends recommandations for the actual user
-exports.getAllFriendsRecommandationsByUser = async (req, res) => {
-  // Retrieve all user's friends
-  let userFriends = await user_friendsModel.getAllFriendsByUser(req.body.userId)
-  console.log("USER FRIENDS =>", userFriends)
-  if (userFriends.code) {
-    return res
-      .status(500)
-      .json(
-        { 
-          err: "Problème de connexion interne à la base de données" 
-        }
-      )
-  } 
-
-  // retrieve all friends's friends of the user
-  let recommendedFriends = [],
-    friendsOfFriends = []
-  await Promise.all(userFriends.map(async friend => {
-    console.log("FRIEND =>", friend)
-    let friendFriends = await user_friendsModel.getAllFriendsByUser(friend.user_id)
-    if (friendFriends.code) {
-      return res
-        .status(500)
+exports.getRelationIfItExists = async (req, res) => {
+  const { userId, potentialFriendId } = req.params
+  console.log("userid :", userId, "potential friend id :", potentialFriendId);
+  await user_friendsModel.getRelationIfItExists(userId, potentialFriendId)
+    .then(([relation]) => {
+      res
+        .status(200)
         .json(
-          { 
-            message: "Problème de connexion interne à la base de données" 
+          {
+            relation: relation
           }
         )
-    } 
+    })
+    .catch(err => {
+      res
+        .status(500)
+        .json(
+          {
+            message: "Erreur lors de la connection avec la base de données"
+          }
+        )
+    })
+}
 
-    // Remove the objects containing user who is connected
-    friendFriends = friendFriends.filter(friend => friend.user_id !== req.body.userId)
-    console.log(`Amis de ${friend.user_name} => ${friendFriends}`)
-    friendsOfFriends.push({friend: friend, friendsFriend: {...friendFriends}})
+// Get all friends recommandations for the actual user
+exports.getAllFriendsRecommandationsByUser = async (req, res) => {
+  // Retrieve all friends and invitations send and received by the user, put all of them in an array
+  let userFriendsList = await user_friendsModel.getAllFriendsByUser(req.params.userId)
+  const receivedInvitationsByUser = await user_friendsModel.getAllPendingInvitationsReceivedByUser(req.params.userId)
+  const sentInvitationsByUser = await user_friendsModel.getAllPendingInvitationsSentByUser(req.params.userId)
+  userFriendsList = [...userFriendsList, ...receivedInvitationsByUser, ...sentInvitationsByUser]
 
-    // Among this list make an array of friends who are not in the friend's user list
-    for (let i = 0; i < friendFriends.length; i++) {
-      let checkIfExist = userFriends.find(friend => friend.user_id === friendFriends[i].user_id)
-      if (!checkIfExist) {
-        // get a request to the database to see if user has a pending request about each recommended user, if not keep it in the array.
-        let seeRelation = await user_friendsModel.isTherePendingRelation(req.body.userId, friendFriends[i].user_id)
+  let friendsOfFriends = await Promise.all(
+    userFriendsList.map(
+      async friend => {
+        let friendsFriend = await user_friendsModel.getAllFriendsByUser(friend.user_id)
+        
+        for (let i = 0; i < friendsFriend.length; i++) {
+          let isAlreadyUserFriend = false
 
-        if (seeRelation.code) {
-          return res
-            .status(500)
-            .json(
-              { 
-                err: "Problème de connexion interne à la base de données" 
+          if (friendsFriend[i].user_id !== req.decodedToken.id) {
+            for (let j = 0; j < userFriendsList.length; j++) {
+              if (friendsFriend[i].user_id === userFriendsList[j].user_id) {
+                //console.log('in user friend list :', friendsFriend[i])
+                isAlreadyUserFriend = true
               }
-            )
-        } 
-        console.log(`See the relation beetween user ${req.body.userId} and user ${friendFriends[i].user_id}`)
-        console.log("relation in db =>", seeRelation)
+            }
 
-        if (!seeRelation.length) {
-          // We add the original friend to the object in userFriend
-          let recommendedFriend = friendFriends[i]
-          recommendedFriend.userFriend = { id : friend.user_id, name: friend.user_name, imageProfile: friend.user_profile_img }
-          console.log("RECOMMEDED FRIEND =>", recommendedFriend)
-          recommendedFriends = [...recommendedFriends, recommendedFriend]
+            //We remove all users recommended by another user whose are in a pending relation with the main user
+            if (receivedInvitationsByUser.length) {
+              for(k = 0; k < receivedInvitationsByUser.length; k++) {
+                if(receivedInvitationsByUser[k].user_id === friend.user_id) {
+                  isAlreadyUserFriend = true
+                }
+              }
+            }
+
+            if(sentInvitationsByUser.length) {
+              for(l = 0; l < sentInvitationsByUser.length; l++) {
+                if(sentInvitationsByUser[l].user_id === friend.user_id) {
+                  isAlreadyUserFriend = true
+                }
+              }
+            }
+
+            if (isAlreadyUserFriend === false) {
+              console.log("FriendsFriend : ", friendsFriend[i], "friend : ", friend)
+              
+              let recommendedFriend = {}
+              recommendedFriend.friend = friendsFriend[i]
+              recommendedFriend.friendInCommon = friend
+              return recommendedFriend
+            }
+          }
+
         }
-      }
-      console.log("already exist in list =>", checkIfExist)
-    }
-    console.log("Potential friends =>", recommendedFriends)
-  }))
-  
-  // Reformat friends recommandations
-  let reformatedFriendsRecommandations = []
-  for (let i = 0; i < recommendedFriends.length; i++) {
-    let friendsInCommonCount = 0
-    let object = {}
-    object.id = recommendedFriends[i].user_id
-    object.name = recommendedFriends[i].user_name
-    object.profileImg = recommendedFriends[i].user_profile_img
-    object.friendsInCommonCount = friendsInCommonCount
 
-    let findIfInArray = reformatedFriendsRecommandations.find(person => person.id === recommendedFriends[i].user_id)
-    if (!findIfInArray) {
-      object.friendsInCommon = [recommendedFriends[i].userFriend]
-      object.friendsInCommonCount++
-      reformatedFriendsRecommandations = [...reformatedFriendsRecommandations, object]
-    } else {
-      // console.log("FIND =>", findIfInArray)
-      findIfInArray.friendsInCommonCount++
-      findIfInArray.friendsInCommon = [...findIfInArray.friendsInCommon, recommendedFriends[i].userFriend]
-    }
-  }
-  reformatedFriendsRecommandations = reformatedFriendsRecommandations.sort((a, b) => b.friendsInCommonCount - a.friendsInCommonCount)
-  friendsOfFriends.push({FriendsRecommandations : reformatedFriendsRecommandations})
-
-  // For the friend research page we just want to send the recommandations
-  return res
-    .status(200)
-    .json(
-      { 
-        FriendsRecommandations: reformatedFriendsRecommandations 
+       // return {friend: friendsFriend, friendInCommon: friend}
+        //if (Object.keys(recommendedFriend).length > 0) return recommendedFriend
       }
     )
+  )
+  
+  // reformatte friendsOfFriends to avoid nul item
+  friendsOfFriends = friendsOfFriends.filter(item => item)
+  
+  // Create a new array, loop to friendsOffFriends array, if new array doesn't have the recommended user yet push it in, if new has already the recommended user in him we increment a common_friends_count and attach the commonUser to the recommended friend
+  let formattedRecommendedFriends = []
+  let recommandedFriendsId = []
+    for(let i = 0; i < friendsOfFriends.length; i++) {
+      if (!recommandedFriendsId.includes(friendsOfFriends[i].friend.user_id)) {
+        recommandedFriendsId.push(friendsOfFriends[i].friend.user_id)
+        let addedFriend = {}
+        addedFriend.recommendedFriend = {...friendsOfFriends[i].friend}
+        addedFriend.common_friends = [{...friendsOfFriends[i].friendInCommon}]
+        addedFriend.common_friends_count = 1
+        formattedRecommendedFriends = [...formattedRecommendedFriends, addedFriend]
+      } else {
+        for(let j = 0; j < formattedRecommendedFriends.length; j++) {
+          if (formattedRecommendedFriends[j].recommendedFriend.user_id === friendsOfFriends[i].friend.user_id) {
+            formattedRecommendedFriends[j].common_friends_count++
+            formattedRecommendedFriends[j].common_friends = [...formattedRecommendedFriends[j].common_friends, {...friendsOfFriends[i].friendInCommon}]
+          }
+        }
+      }
+    }
+
+  return res.status(200).send(formattedRecommendedFriends)
 }
 
 exports.proposeToBeFriend = async (req, res) => {
@@ -166,7 +173,7 @@ exports.proposeToBeFriend = async (req, res) => {
 }
 
 exports.getAllPendingInvitationsSentByUser = async (req, res) => {
-  await user_friendsModel.getAllPendingInvitationsSentByUser(req.body.userId)
+  await user_friendsModel.getAllPendingInvitationsSentByUser(req.params.userId)
     .then(response => {
       if (response.length) {
         return res
@@ -201,7 +208,7 @@ exports.getAllPendingInvitationsSentByUser = async (req, res) => {
 }
 
 exports.getAllPendingInvitationsReceivedByUser = async (req, res) => {
-    await user_friendsModel.getAllPendingInvitationsReceivedByUser(req.body.userId)
+    await user_friendsModel.getAllPendingInvitationsReceivedByUser(req.params.userId)
       .then(response => {
         if (response.length) {
           res
@@ -358,18 +365,21 @@ exports.getAllFriendsPostsByUser = async (req, res) => {
   // Get likes count for each post if it exist
   if (posts.length > 0) {
     posts = await Promise.all(posts.map(async post => {
-      let likesCount = await post_likesModel.getLikesCountForPost(post.post_id)
-      if (likesCount.code) {
+      let likesSenders = await post_likesModel.getUsersWhoLikePost(post.id)
+      if (likesSenders.code) {
         return res
           .status(500)
           .json(
             { 
-              message: "Erreur de connexion interne à la base de données" 
+              message: "Erreur de connexion interne"  
             }
           )
       } 
       
-      return {...post, likesCount: likesCount[0]["COUNT(*)"]}
+      // Format post date
+      post.post_created_at = utils.formatDate(post.post_created_at)
+      if(post.post_updated_at) post.post_updated_at = utils.formatDate(post.post_updated_at)
+      return {...post, likes: likesSenders}
     }))
     
     // Get comments for each post if it exist
@@ -404,6 +414,10 @@ exports.getAllFriendsPostsByUser = async (req, res) => {
           profileImg: sender[0].image
         }
         comment.senderInfos = sender
+
+        // Format comment date
+        comment.created_at = utils.formatDate(comment.created_at)
+        if(comment.updated_at) comment.updated_at = utils.formatDate(comment.updated_at)
       }))
   
       return {...post, comments : comments}

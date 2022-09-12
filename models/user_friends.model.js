@@ -6,6 +6,13 @@ exports.getRelationById = async (relationId) => {
     .then(connection => connection.query(query, [relationId]))
 }
 
+exports.getRelationIfItExists = async (userId, potentialFriendId) => {
+  let query = "SELECT * FROM user_friends WHERE user_id = ? AND friend_user_id = ? UNION SELECT * FROM user_friends WHERE user_id = ? AND friend_user_id = ?"
+  return pool
+    .then(connection => connection.query(query, [userId, potentialFriendId, potentialFriendId, userId]))
+    .catch(error => console.log(error))
+}
+
 exports.getAllFriendsByUser = async (userId) => {
   let query = "SELECT u.id as user_id, u.name as user_name, u.image as user_profile_img, u.last_connection as user_last_connection, user_friends.id as relation_id"
   + " FROM users as u"

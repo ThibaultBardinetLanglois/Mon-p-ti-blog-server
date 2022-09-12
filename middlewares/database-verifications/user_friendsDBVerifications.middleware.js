@@ -5,6 +5,77 @@ const user_friendsModel = require("../../models/user_friends.model"),
   userModel = require("../../models/user.model");
 
 
+exports.getRelationIfItExists = async (req, res, next) => {
+  let user = await userModel.getUserById(req.params.userId)
+  if (user.code) {
+    return res
+      .status(500)
+      .json(
+        {
+          message: "Erreur de connection interne à la base de données"
+        }
+      )
+  }
+
+  if (!user.length) {
+    return res
+      .status(400)
+      .json(
+        {
+          message: "Un des utilisateur n'existe pas en base de données"
+        }
+      )
+  }
+
+  let potentialFriend = await userModel.getUserById(req.params.potentialFriendId)
+  if (potentialFriend.code) {
+    return res
+      .status(500)
+      .json(
+        {
+          message: "Erreur de connection interne à la base de données"
+        }
+      )
+  }
+
+  if (!potentialFriend.length) {
+    return res
+      .status(400)
+      .json(
+        {
+          message: "Un des utilisateur n'existe pas en base de données"
+        }
+      )
+  }
+
+  next()
+}
+
+exports.checkIfUserIdInParamsExists = async (req, res , next) => {
+  let user = await userModel.getUserById(req.params.userId)
+  if (user.code) {
+    return res
+      .status(500)
+      .json(
+        {
+          message: "Erreur de connection interne à la base de données"
+        }
+      )
+  }
+
+  if (!user.length) {
+    return res
+      .status(400)
+      .json(
+        {
+          message: "L'utilisateur passé en paramètre de la requête n'existe pas en base de données"
+        }
+      )
+  }
+
+  next()
+}
+
 exports.proposeToBeFriend = async (req, res, next) => {
   // Check if friend exist in database
   let friendInDB = await userModel.getUserById(req.body.friendId)

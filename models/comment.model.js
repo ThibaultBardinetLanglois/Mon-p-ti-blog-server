@@ -1,7 +1,7 @@
 const pool = require("../config/database").pool;
 
 exports.getAllByPost = async (postId) => {
-  let query = "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC"
+  let query = "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at DESC"
   return pool
     .then(connection => connection.query(query, [postId]))
     .catch(err => console.log(err))

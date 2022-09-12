@@ -41,6 +41,23 @@ exports.getLastPostsForNoLogged = async (req, res) => {
     post.created_at = utils.formatDate(post.created_at)
     if(post.updated_at) post.updated_at = utils.formatDate(post.updated_at)
 
+    let sender = await userModel.getUserById(post.user_id)
+      if (sender.code) {
+        return res
+          .status(500)
+          .json(
+            { 
+              message: "Erreur de connexion interne" 
+            }
+          )
+      } 
+      sender = {
+        id: sender[0].id,
+        name: sender[0].name,
+        profileImg: sender[0].image
+      }
+      post.senderInfos = sender
+
     return {...post, likesCount : likesCount}
   }))
 
@@ -79,6 +96,10 @@ exports.getLastPostsForNoLogged = async (req, res) => {
       delete sender[0].last_connection
       // Attach sender to the comment
       comment.senderInfos = sender
+
+      // format date in the comment
+      comment.created_at = utils.formatDate(comment.created_at)
+      if(comment.updated_at) comment.updated_at = utils.formatDate(comment.updated_at)
     }))
 
     return {...post, comments : comments}

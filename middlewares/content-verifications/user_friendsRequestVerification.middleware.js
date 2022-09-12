@@ -37,6 +37,37 @@ exports.checkUserIdInRequestBody = (req, res, next) => {
   next()
 }
 
+exports.getRelationIfItExists = async (req, res, next) => {
+  if (
+    !req.params?.userId ||
+    !req.params?.potentialFriendId ||
+    Object.keys(req.params).length !== 2
+    ) {
+    return res
+      .status(400)
+      .json(
+        {
+          message: "La requête ne contient pas les bons paramètres"
+        }
+      )
+  }
+
+  if (
+    isNaN(Number(req.params.userId)) ||
+    isNaN(Number(req.params.potentialFriendId))
+    ) {
+    return res
+      .status(400)
+      .json(
+        {
+          message: "Les paramètres contenus dans la requête ne sont pas du bon type"
+        }
+      )
+  }
+
+  next()
+}
+
 exports.checkUserIdInRequestParams = (req, res, next) => {
   console.log("req params for checking :", req.params)
   if (
